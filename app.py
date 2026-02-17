@@ -1,117 +1,123 @@
 import streamlit as st
 import pandas as pd
-import requests
-from database import get_connection, init_db
-from pdf_generator import generate_pdf
+import json,requests
+from database import conn,init
+from pdf_generator import make_pdf
 
-init_db()
-conn = get_connection()
-cur = conn.cursor()
+init()
+c=conn()
+cur=c.cursor()
 
 st.set_page_config(layout="wide")
-st.title("💍 CRM Кошторис Обручок")
+st.title("💍 Кошторис обручок")
 
-tab1, tab2, tab3 = st.tabs(["Менеджер", "Адмінка", "Історія"])
+tabs=st.tabs(["Менеджер","Адмінка","Історія"])
+manager,admin,history=tabs
 
-# ================= NBU =================
+# ========= USD =========
 
-def update_usd():
+def usd():
     try:
-        r = requests.get("https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json", timeout=5)
-        usd = next(x for x in r.json() if x["cc"] == "USD")["rate"]
-        cur.execute("UPDATE settings SET usd_rate=? WHERE id=1", (usd,))
-        conn.commit()
-    except:
-        pass
+        r=requests.get("https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json",timeout=5)
+        rate=next(x for x in r.json() if x["cc"]=="USD")["rate"]
+        cur.execute("UPDATE settings SET usd=? WHERE id=1",(rate,))
+        c.commit()
+    except: pass
 
-update_usd()
+usd()
 
 # ================= ADMIN =================
 
-with tab2:
-    st.header("Адмін панель")
+with admin:
 
-    st.subheader("Додати метал")
-    name = st.text_input("Назва металу")
-    price = st.number_input("Ціна за грам (₴)", 0.0)
+    st.header("Адмін")
+
+    m=st.text_input("Метал")
+    mp=st.number_input("₴/г",0.0)
 
     if st.button("Додати метал"):
-        cur.execute("INSERT INTO metals(name,price_per_gram) VALUES(?,?)", (name, price))
-        conn.commit()
-        st.success("Метал додано")
+        cur.execute("INSERT INTO metals VALUES(NULL,?,?)",(m,mp));c.commit()
 
-    st.subheader("Додати каміння")
-    sname = st.text_input("Назва каміння")
-    sprice = st.number_input("Ціна каміння (₴)", 0.0)
+    s=st.text_input("Каміння")
+    sp=st.number_input("₴ каміння",0.0)
 
     if st.button("Додати каміння"):
-        cur.execute("INSERT INTO stones(name,price) VALUES(?,?)", (sname, sprice))
-        conn.commit()
-        st.success("Каміння додано")
+        cur.execute("INSERT INTO stones VALUES(NULL,?,?)",(s,sp));c.commit()
 
-    st.subheader("Вартість роботи ювеліра")
-    jeweler = st.number_input("₴ за грам", 0.0)
+    jw=st.number_input("Робота ювеліра ₴/г",0.0)
 
-    if st.button("Оновити ціну роботи"):
-        cur.execute("UPDATE settings SET jeweler_price_per_gram=? WHERE id=1", (jeweler,))
-        conn.commit()
-        st.success("Оновлено")
+    if st.button("Зберегти роботу"):
+        cur.execute("UPDATE settings SET jeweler=? WHERE id=1",(jw,))
+        c.commit()
+
+    st.subheader("Метали")
+    st.dataframe(pd.read_sql("SELECT * FROM metals",c))
+
+    st.subheader("Каміння")
+    st.dataframe(pd.read_sql("SELECT * FROM stones",c))
 
 # ================= MANAGER =================
 
-with tab1:
-    st.header("Створити кошторис")
+with manager:
 
-    metals = pd.read_sql("SELECT * FROM metals", conn)
-    stones = pd.read_sql("SELECT * FROM stones", conn)
-    settings = pd.read_sql("SELECT * FROM settings", conn)
+    metals=pd.read_sql("SELECT * FROM metals",c)
+    stones=pd.read_sql("SELECT * FROM stones",c)
+    settings=pd.read_sql("SELECT * FROM settings",c)
 
-    if metals.empty:
-        st.warning("Додайте метали в адмінці")
-    else:
-        metal = st.selectbox("Метал", metals["name"])
-        weight = st.number_input("Вага (г)", 0.0)
+    col1,col2=st.columns(2)
 
-        stone = st.selectbox("Каміння", stones["name"]) if not stones.empty else None
-        qty = st.number_input("Кількість камінців", 0)
+    with col1:
+        size_w=st.text_input("Розмір жіночої")
+        width_w=st.text_input("Ширина жіночої")
+        thick_w=st.text_input("Товщина жіночої")
+        weight_w=st.number_input("Вага жіночої",0.0)
 
-        if st.button("Розрахувати"):
-            metal_price = metals[metals["name"] == metal]["price_per_gram"].values[0]
-            jeweler_price = settings["jeweler_price_per_gram"].values[0]
+    with col2:
+        size_m=st.text_input("Розмір чоловічої")
+        width_m=st.text_input("Ширина чоловічої")
+        thick_m=st.text_input("Товщина чоловічої")
+        weight_m=st.number_input("Вага чоловічої",0.0)
 
-            metal_sum = weight * metal_price
-            work_sum = weight * jeweler_price
-            stone_sum = 0
+    metal=st.selectbox("Метал",metals["name"])
 
-            if stone:
-                stone_price = stones[stones["name"] == stone]["price"].values[0]
-                stone_sum = stone_price * qty
+    stone=st.selectbox("Каміння",stones["name"])
+    qty=st.number_input("Кількість камінців",0)
 
-            total = metal_sum + work_sum + stone_sum
+    if st.button("Згенерувати кошторис"):
 
-            st.success(f"Загальна сума: {total:.2f} ₴")
+        m=metals[metals["name"]==metal].iloc[0]
+        s=stones[stones["name"]==stone].iloc[0]
+        jw=settings["jeweler"].values[0]
 
-            cur.execute(
-                "INSERT INTO estimates(metal,weight,stones,total) VALUES(?,?,?,?)",
-                (metal, weight, stone, total)
-            )
-            conn.commit()
+        total_w=weight_w*m["price"]+weight_w*jw
+        total_m=weight_m*m["price"]+weight_m*jw
+        stone_sum=s["price"]*qty
 
-            pdf_data = {
-                "Метал": metal,
-                "Вага": f"{weight} г",
-                "Метал вартість": f"{metal_sum:.2f}",
-                "Робота": f"{work_sum:.2f}",
-                "Каміння": f"{stone_sum:.2f}",
-                "Разом": f"{total:.2f}"
-            }
+        total=total_w+total_m+stone_sum
 
-            pdf = generate_pdf(pdf_data)
-            st.download_button("⬇️ Завантажити PDF", pdf, "koshtorys.pdf")
+        rows=[
+            {"type":"row","c1":"Розмір","c2":size_w,"c3":size_m},
+            {"type":"row","c1":"Ширина","c2":width_w,"c3":width_m},
+            {"type":"row","c1":"Товщина","c2":thick_w,"c3":thick_m},
+
+            {"type":"section","title":"ЦІНОУТВОРЕННЯ"},
+            {"type":"row","c1":"Метал","c2":metal,"c3":metal},
+            {"type":"row","c1":"Вага","c2":weight_w,"c3":weight_m},
+
+            {"type":"section","title":"КАМІНЦІ"},
+            {"type":"row","c1":"Тип","c2":stone,"c3":stone},
+            {"type":"row","c1":"Кількість","c2":qty,"c3":qty},
+        ]
+
+        pdf=make_pdf(rows,total)
+
+        cur.execute("INSERT INTO estimates(data,total) VALUES(?,?)",(json.dumps(rows),total))
+        c.commit()
+
+        st.success(f"Разом: {total:.2f} ₴")
+        st.download_button("⬇️ PDF",pdf,"koshtorys.pdf")
 
 # ================= HISTORY =================
 
-with tab3:
-    st.header("Історія кошторисів")
-    history = pd.read_sql("SELECT * FROM estimates ORDER BY id DESC", conn)
-    st.dataframe(history)
+with history:
+    st.dataframe(pd.read_sql("SELECT * FROM estimates ORDER BY id DESC",c))
