@@ -5,25 +5,21 @@ DB = "data.db"
 def conn():
     return sqlite3.connect(DB, check_same_thread=False)
 
-def ensure_table(cur, name, expected_cols, create_sql):
-
+def ensure(cur, name, cols, create_sql):
     try:
         cur.execute(f"PRAGMA table_info({name})")
-        cols = [x[1] for x in cur.fetchall()]
-
-        if cols != expected_cols:
+        existing = [x[1] for x in cur.fetchall()]
+        if existing != cols:
             cur.execute(f"DROP TABLE IF EXISTS {name}")
             cur.execute(create_sql)
-
     except:
         cur.execute(create_sql)
 
 def init():
-
     c = conn()
     cur = c.cursor()
 
-    ensure_table(cur,"metals",
+    ensure(cur,"metals",
         ["id","name","price"],
         """
         CREATE TABLE metals(
@@ -33,7 +29,7 @@ def init():
         )
         """)
 
-    ensure_table(cur,"stones",
+    ensure(cur,"stones",
         ["id","name","price"],
         """
         CREATE TABLE stones(
@@ -43,7 +39,7 @@ def init():
         )
         """)
 
-    ensure_table(cur,"settings",
+    ensure(cur,"settings",
         ["id","jeweler","usd"],
         """
         CREATE TABLE settings(
@@ -57,4 +53,11 @@ def init():
     CREATE TABLE IF NOT EXISTS estimates(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         data TEXT,
-        t
+        total REAL
+    )
+    """)
+
+    cur.execute("INSERT OR IGNORE INTO settings(id,jeweler,usd) VALUES(1,300,0)")
+
+    c.commit()
+    c.close()
