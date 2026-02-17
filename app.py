@@ -86,7 +86,14 @@ with manager:
     if st.button("Згенерувати кошторис"):
 
         m=metals[metals["name"]==metal].iloc[0]
-        s=stones[stones["name"]==stone].iloc[0]
+        filtered = stones[stones["name"] == stone]
+
+        if filtered.empty:
+            st.error("❌ Каміння не знайдено. Додайте його в адмінці.")
+            st.stop()
+        
+        s = filtered.iloc[0]
+
         jw=settings["jeweler"].values[0]
 
         total_w=weight_w*m["price"]+weight_w*jw
