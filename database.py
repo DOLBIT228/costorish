@@ -5,57 +5,56 @@ DB = "data.db"
 def conn():
     return sqlite3.connect(DB, check_same_thread=False)
 
+def ensure_table(cur, name, expected_cols, create_sql):
+
+    try:
+        cur.execute(f"PRAGMA table_info({name})")
+        cols = [x[1] for x in cur.fetchall()]
+
+        if cols != expected_cols:
+            cur.execute(f"DROP TABLE IF EXISTS {name}")
+            cur.execute(create_sql)
+
+    except:
+        cur.execute(create_sql)
+
 def init():
+
     c = conn()
     cur = c.cursor()
 
-    # ---------- detect old settings table ----------
-    try:
-        cur.execute("PRAGMA table_info(settings)")
-        cols = [x[1] for x in cur.fetchall()]
-        if "jeweler" not in cols or "usd" not in cols:
-            cur.execute("DROP TABLE IF EXISTS settings")
-    except:
-        pass
+    ensure_table(cur,"metals",
+        ["id","name","price"],
+        """
+        CREATE TABLE metals(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            price REAL
+        )
+        """)
 
-    # ---------- tables ----------
+    ensure_table(cur,"stones",
+        ["id","name","price"],
+        """
+        CREATE TABLE stones(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            price REAL
+        )
+        """)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS metals(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        price REAL
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS stones(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        price REAL
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS settings(
-        id INTEGER PRIMARY KEY,
-        jeweler REAL DEFAULT 300,
-        usd REAL DEFAULT 0
-    )
-    """)
+    ensure_table(cur,"settings",
+        ["id","jeweler","usd"],
+        """
+        CREATE TABLE settings(
+            id INTEGER PRIMARY KEY,
+            jeweler REAL DEFAULT 300,
+            usd REAL DEFAULT 0
+        )
+        """)
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS estimates(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         data TEXT,
-        total REAL
-    )
-    """)
-
-    # ---------- ensure settings row ----------
-    cur.execute("SELECT COUNT(*) FROM settings")
-    if cur.fetchone()[0] == 0:
-        cur.execute("INSERT INTO settings(id,jeweler,usd) VALUES(1,300,0)")
-
-    c.commit()
-    c.close()
+        t
