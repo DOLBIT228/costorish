@@ -2,30 +2,38 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 import io
 
-def generate_pdf(data):
-    buffer = io.BytesIO()
-    p = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
+def make_pdf(rows,total,photos=None):
 
-    y = height - 60
+    buf=io.BytesIO()
+    p=canvas.Canvas(buf,pagesize=A4)
+    w,h=A4
 
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(50, y, "Кошторис обручок")
-    y -= 40
+    y=h-60
+    p.setFont("Helvetica-Bold",14)
+    p.drawString(50,y,"КОШТОРИС ОБРУЧОК")
+    y-=30
 
-    p.setFont("Helvetica", 12)
+    p.setFont("Helvetica",9)
 
-    for key, value in data.items():
-        p.drawString(50, y, f"{key}: {value}")
-        y -= 20
+    for r in rows:
+        if r["type"]=="section":
+            y-=15
+            p.setFont("Helvetica-Bold",10)
+            p.drawString(50,y,r["title"])
+            y-=10
+            p.setFont("Helvetica",9)
+        else:
+            p.drawString(50,y,r["c1"])
+            p.drawString(220,y,r["c2"])
+            p.drawString(380,y,r["c3"])
+            y-=12
 
-    p.setFont("Helvetica-Bold", 14)
-    y -= 10
-    p.drawString(50, y, f"ЗАГАЛЬНА СУМА: {data['Разом']} ₴")
+        if y<60:
+            p.showPage()
+            y=h-60
 
-    p.showPage()
+    p.setFont("Helvetica-Bold",12)
+    p.drawString(50,y-20,f"ЗАГАЛОМ: {total:.2f} ₴")
+
     p.save()
-
-    pdf = buffer.getvalue()
-    buffer.close()
-    return pdf
+    return buf.getvalue()
