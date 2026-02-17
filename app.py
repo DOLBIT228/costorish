@@ -14,7 +14,7 @@ st.title("💍 Кошторис обручок")
 tabs = st.tabs(["Менеджер", "Адмінка", "Історія"])
 manager, admin, history = tabs
 
-# ================= USD =================
+# ========= USD =========
 
 def update_usd():
     try:
@@ -65,7 +65,9 @@ with admin:
 with manager:
     metals = pd.read_sql("SELECT * FROM metals", c)
     stones = pd.read_sql("SELECT * FROM stones", c)
-    settings = pd.read_sql("SELECT * FROM settings", c)
+
+    cur.execute("SELECT jeweler FROM settings WHERE id=1")
+    jeweler = float(cur.fetchone()[0])
 
     if metals.empty or stones.empty:
         st.error("Додай метали і каміння в адмінці")
@@ -93,10 +95,9 @@ with manager:
 
         m = metals[metals["name"] == metal].iloc[0]
         s = stones[stones["name"] == stone].iloc[0]
-        jw = float(settings.iloc[0]["jeweler"])
 
-        total_w = weight_w * m["price"] + weight_w * jw
-        total_m = weight_m * m["price"] + weight_m * jw
+        total_w = weight_w * m["price"] + weight_w * jeweler
+        total_m = weight_m * m["price"] + weight_m * jeweler
         stone_sum = qty * s["price"]
 
         total = total_w + total_m + stone_sum
